@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Mansão Assombrada 3D — Cena Inicial</title>
+  <style>
+    html, body { margin: 0; height: 100%; overflow: hidden; background: #05030a; font-family: Georgia, 'Times New Roman', serif; color: #ecdcb4; }
+    #app canvas { display: block; }
+    .caixa { position: fixed; background: rgba(12, 6, 16, 0.78); border: 1px solid #7a5a2a; border-radius: 6px; padding: 10px 14px; backdrop-filter: blur(3px); }
+    #titulo { top: 12px; left: 12px; }
+    #titulo h1 { margin: 0; font-size: 18px; letter-spacing: 0.5px; color: #f2d995; }
+    #titulo p { margin: 3px 0 0; font-size: 12px; color: #b9a57c; }
+    #controles { bottom: 12px; left: 12px; font-size: 12px; line-height: 1.6; }
+    #controles b { display: inline-block; min-width: 72px; color: #f2d995; }
+    #status { top: 12px; right: 12px; font-size: 12px; line-height: 1.6; text-align: right; font-family: Consolas, monospace; }
+    #status span { color: #f2d995; }
+    #painel { display: none; top: 118px; right: 12px; max-height: 60vh; overflow: auto; font-size: 11px; font-family: Consolas, monospace; }
+    #painel.visivel { display: block; }
+    #painel table { border-collapse: collapse; }
+    #painel th, #painel td { padding: 1px 6px; text-align: right; white-space: pre; }
+    #painel th { color: #f2d995; border-bottom: 1px solid #7a5a2a; }
+    #painel td:first-child, #painel th:first-child { text-align: left; }
+    #painel .legenda { margin-top: 6px; font-size: 11px; }
+    .x { color: #ff5555; } .y { color: #55ff55; } .z { color: #5599ff; }
+  </style>
+  <!-- Three.js r186 via CDN (módulos ES) -->
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.186.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.186.1/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <div id="app"></div>
+
+  <div id="titulo" class="caixa">
+    <h1>Mansão Assombrada 3D — Cena Inicial</h1>
+    <p>Three.js r186 · WebGL · Computação Gráfica 2026</p>
+  </div>
+
+  <div id="status" class="caixa">
+    Câmera: <span id="hud-camera">—</span><br />
+    Zelador: <span id="hud-pos">—</span><br />
+    FPS: <span id="hud-fps">—</span>
+  </div>
+
+  <div id="painel" class="caixa">
+    <table>
+      <thead><tr><th>Objeto</th><th>x</th><th>y</th><th>z</th><th>rotY</th><th>esc.</th></tr></thead>
+      <tbody id="painel-corpo"></tbody>
+    </table>
+    <div class="legenda">Eixos: <span class="x">X = Leste</span> · <span class="y">Y = cima</span> · <span class="z">Z = Sul</span> · grade de 1 m</div>
+  </div>
+
+  <div id="controles" class="caixa">
+    <b>W A S D</b> mover &nbsp; <b>Mouse / Q E</b> mirar<br />
+    <b>Clique / Espaço</b> aspirador &nbsp; <b>C</b> trocar câmera<br />
+    <b>H</b> eixos, grade e colisores &nbsp; <b>B</b> prévia do Chefe
+  </div>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
