@@ -192,6 +192,12 @@ export function criarSala() {
 
   return {
     grupo: sala, colisores, registro,
+    // luzes expostas para liga/desliga individual (Entrega 02)
+    luzes: {
+      ambiente,
+      lustre: lustre.userData.luz,
+      arandelas: luzesVela.map((l) => l.luz).filter((l) => l !== lustre.userData.luz),
+    },
     limites: { minX: -MEIA_L, maxX: MEIA_L, minZ: -MEIA_P, maxZ: MEIA_P },
     atualizar(dt, t) { for (const f of animaveis) f(dt, t); },
   };
@@ -475,6 +481,7 @@ function criarLustre(luzesVela) {
   luz.shadow.bias = -0.002;
   g.add(luz);
   luzesVela.push({ luz, base: luz.intensity, fase: 0 });
+  g.userData.luz = luz;   // referência para o controle de luzes (main.js)
   return g;
 }
 

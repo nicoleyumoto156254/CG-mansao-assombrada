@@ -1,5 +1,5 @@
 // ============================================================================
-// main.js — Cena 3D inicial: renderizador, câmeras, entrada e laço principal
+// main.js — Cena 3D: renderizador, câmeras, projeção perspectiva, luzes, entrada e laço principal
 // ============================================================================
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
@@ -57,7 +57,20 @@ chefe.visible = false;
 scene.add(chefe);
 
 // ---------------------------------------------------------------- câmeras
-const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
+// PROJEÇÃO PERSPECTIVA — a matriz de projeção é DEFINIDA aqui, pelos parâmetros
+// (fov vertical, aspecto, near, far) do THREE.PerspectiveCamera. Objetos distantes
+// ficam menores (divisão por w no vertex shader). Ela é RECALCULADA em
+// camera.updateProjectionMatrix() (resize e troca de FOV) e APLICADA a cada
+// renderer.render(scene, camera): gl_Position = projectionMatrix * viewMatrix * modelMatrix * vértice.
+const FOVS = [60, 100, 30];                 // normal, grande-angular (perspectiva exagerada), tele
+let fovIdx = 0;
+const camera = new THREE.PerspectiveCamera(FOVS[0], window.innerWidth / window.innerHeight, 0.1, 100);
+function alternarFov() {
+  fovIdx = (fovIdx + 1) % FOVS.length;
+  camera.fov = FOVS[fovIdx];
+  camera.updateProjectionMatrix();          // reconstrói a matriz de projeção com o novo FOV
+  document.getElementById('hud-fov').textContent = FOVS[fovIdx] + '°';
+}
 const orbit = new OrbitControls(camera, renderer.domElement);
 orbit.target.set(0, 1.5, 0);
 orbit.enableDamping = true;
@@ -91,6 +104,22 @@ function posicionarTerceira(fator) {
   alvoCam.copy(zelador.position).addScaledVector(frente, 3).addScaledVector(direita, 0.7).setY(1.3);
   camera.lookAt(alvoCam);
 }
+
+// ------------------------------------------------------------------ luzes
+// Cada grupo pode ser ligado/desligado individualmente (teclas 1–5) para
+// mostrar a contribuição de cada fonte para a iluminação da cena.
+const GRUPOS_LUZ = [
+  { tecla: 'Digit1', nome: 'Ambiente (AmbientLight)',       luzes: [sala.luzes.ambiente] },
+  { tecla: 'Digit2', nome: 'Lustre (PointLight + sombra)',  luzes: [sala.luzes.lustre] },
+  { tecla: 'Digit3', nome: 'Arandelas (8 PointLights)',     luzes: sala.luzes.arandelas },
+  { tecla: 'Digit4', nome: 'Lanterna (SpotLight + sombra)', luzes: [zelador.spot] },
+  { tecla: 'Digit5', nome: 'Fantasmas (4 PointLights)',     luzes: fantasmas.map((f) => f.luz).filter(Boolean) },
+];
+function atualizarHudLuzes() {
+  document.getElementById('hud-luzes').innerHTML = GRUPOS_LUZ.map((g, i) =>
+    `<span class="${g.luzes[0].visible ? 'on' : 'off'}">[${i + 1}] ${g.nome}: ${g.luzes[0].visible ? 'ON' : 'OFF'}</span>`).join('<br />');
+}
+function alternarLuz(g) { const v = !g.luzes[0].visible; g.luzes.forEach((l) => (l.visible = v)); atualizarHudLuzes(); }
 
 // --------------------------------------------------- auxiliares de inspeção
 // Grade 1 m, eixos globais e eixos locais de cada personagem (tecla H)
@@ -142,6 +171,9 @@ const teclas = new Set();
 addEventListener('keydown', (e) => {
   teclas.add(e.code);
   if (e.code === 'KeyC') definirModo(MODOS[(MODOS.indexOf(modo) + 1) % MODOS.length]);
+  const grupo = GRUPOS_LUZ.find((g) => g.tecla === e.code);
+  if (grupo) alternarLuz(grupo);
+  if (e.code === 'KeyP') alternarFov();
   if (e.code === 'KeyH') alternarAjudantes();
   if (e.code === 'KeyB') chefe.visible = !chefe.visible;
   if (e.code === 'Space') e.preventDefault();
@@ -205,7 +237,7 @@ function quadro(agora) {
   if (modo === 'terceira') posicionarTerceira(1 - Math.exp(-dt * 6));
   if (modo === 'livre') orbit.update();
 
-  renderer.render(scene, camera);
+  renderer.render(scene, camera);   // aplica viewMatrix + projectionMatrix da câmera ativa
 
   // HUD
   quadros++; acumFps += dt;
@@ -227,6 +259,7 @@ addEventListener('resize', () => {
 });
 
 definirModo('terceira');
+atualizarHudLuzes();
 requestAnimationFrame(quadro);
 
 // Acesso pelo console do navegador (útil para depurar e gerar capturas)

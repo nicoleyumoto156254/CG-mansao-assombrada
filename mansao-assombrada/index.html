@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mansão Assombrada 3D — Cena Inicial</title>
+  <title>Mansão Assombrada 3D — Câmeras, Perspectiva e Iluminação</title>
   <style>
     html, body { margin: 0; height: 100%; overflow: hidden; background: #05030a; font-family: Georgia, 'Times New Roman', serif; color: #ecdcb4; }
     #app canvas { display: block; }
@@ -15,6 +15,9 @@
     #controles b { display: inline-block; min-width: 72px; color: #f2d995; }
     #status { top: 12px; right: 12px; font-size: 12px; line-height: 1.6; text-align: right; font-family: Consolas, monospace; }
     #status span { color: #f2d995; }
+    #luzes { bottom: 12px; right: 12px; font-size: 12px; line-height: 1.6; }
+    #luzes b { color: #f2d995; }
+    #luzes .on { color: #9cff9c; } #luzes .off { color: #ff7a7a; }
     #painel { display: none; top: 118px; right: 12px; max-height: 60vh; overflow: auto; font-size: 11px; font-family: Consolas, monospace; }
     #painel.visivel { display: block; }
     #painel table { border-collapse: collapse; }
@@ -38,15 +41,17 @@
   <div id="app"></div>
 
   <div id="titulo" class="caixa">
-    <h1>Mansão Assombrada 3D — Cena Inicial</h1>
+    <h1>Mansão Assombrada 3D — Entrega 02</h1>
     <p>Three.js r186 · WebGL · Computação Gráfica 2026</p>
   </div>
 
   <div id="status" class="caixa">
-    Câmera: <span id="hud-camera">—</span><br />
+    Câmera: <span id="hud-camera">—</span> · FOV: <span id="hud-fov">60°</span><br />
     Zelador: <span id="hud-pos">—</span><br />
     FPS: <span id="hud-fps">—</span>
   </div>
+
+  <div id="luzes" class="caixa"><b>Luzes</b> (teclas 1–5)<br /><div id="hud-luzes"></div></div>
 
   <div id="painel" class="caixa">
     <table>
@@ -59,6 +64,7 @@
   <div id="controles" class="caixa">
     <b>W A S D</b> mover &nbsp; <b>Mouse / Q E</b> mirar<br />
     <b>Clique / Espaço</b> aspirador &nbsp; <b>C</b> trocar câmera<br />
+    <b>1–5</b> ligar/desligar luzes &nbsp; <b>P</b> trocar FOV (60/100/30°)<br />
     <b>H</b> eixos, grade e colisores &nbsp; <b>B</b> prévia do Chefe
   </div>
 
