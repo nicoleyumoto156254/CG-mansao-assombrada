@@ -1,0 +1,21 @@
+# Sistema operacional
+.DS_Store
+Thumbs.db
+desktop.ini
+*~
+
+# Editores
+.vscode/
+.idea/
+*.swp
+
+# Node (caso use `npx serve` ou ferramentas locais)
+node_modules/
+npm-debug.log*
+
+# Python (`python -m http.server`)
+__pycache__/
+
+# Variáveis de ambiente / segredos
+.env
+.env.*
