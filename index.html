@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mansão Assombrada 3D — Câmeras, Perspectiva e Iluminação</title>
+  <title>Mansão Assombrada 3D — Texturas e Materiais</title>
   <style>
     html, body { margin: 0; height: 100%; overflow: hidden; background: #05030a; font-family: Georgia, 'Times New Roman', serif; color: #ecdcb4; }
     #app canvas { display: block; }
@@ -41,12 +41,13 @@
   <div id="app"></div>
 
   <div id="titulo" class="caixa">
-    <h1>Mansão Assombrada 3D — Entrega 02</h1>
+    <h1>Mansão Assombrada 3D — Entrega 04</h1>
     <p>Three.js r186 · WebGL · Computação Gráfica 2026</p>
   </div>
 
   <div id="status" class="caixa">
     Câmera: <span id="hud-camera">—</span> · FOV: <span id="hud-fov">60°</span><br />
+    Texturas: <span id="hud-texturas">—</span><br />
     Zelador: <span id="hud-pos">—</span><br />
     FPS: <span id="hud-fps">—</span>
   </div>
@@ -65,7 +66,8 @@
     <b>W A S D</b> mover &nbsp; <b>Mouse / Q E</b> mirar<br />
     <b>Clique / Espaço</b> aspirador &nbsp; <b>C</b> trocar câmera<br />
     <b>1–5</b> ligar/desligar luzes &nbsp; <b>P</b> trocar FOV (60/100/30°)<br />
-    <b>H</b> eixos, grade e colisores &nbsp; <b>B</b> prévia do Chefe
+    <b>H</b> eixos, grade e colisores &nbsp; <b>B</b> prévia do Chefe<br />
+    <b>U</b> grade UV &nbsp; <b>R</b> relevo on/off &nbsp; <b>X</b> exportar texturas (.zip)
   </div>
 
   <script type="module" src="js/main.js"></script>

@@ -43,6 +43,9 @@ Alternativas: extensão **Live Server** do VS Code ou `npx serve .`
 | 1 – 5 | liga/desliga cada grupo de luz (ver [Iluminação](#iluminação)) |
 | H | grade de 1 m, eixos globais e locais, colisores e tabela de posição/rotação/escala |
 | B | mostra/oculta o Fantasma Chefe no centro do salão |
+| U | grade UV: mostra as coordenadas de textura de todas as superfícies |
+| R | liga/desliga os mapas de relevo (bump map) |
+| X | baixa um `.zip` com os PNGs das texturas usadas e os layouts UV |
 
 ## Técnicas de Computação Gráfica
 
@@ -75,9 +78,15 @@ A matriz de projeção é definida no construtor, recalculada por `updateProject
 
 Sombras com `PCFShadowMap` (no r186 o PCF já é filtrado), tone mapping ACES e neblina exponencial.
 
-### Texturas procedurais
+### Texturas e mapeamento UV
 
-Nenhuma imagem externa: todas as texturas são geradas em tempo de execução com Canvas 2D (`THREE.CanvasTexture`, em `js/texturas.js`) — piso de tábuas envelhecidas (`RepeatWrapping`), papel de parede vitoriano com lambril, molduras douradas e os quatro quadros:
+Nenhuma imagem externa é carregada: todas as texturas são geradas em tempo de execução com Canvas 2D (`THREE.CanvasTexture`, em `js/texturas.js`), com sementes fixas. As mesmas imagens estão salvas em [`texturas/`](texturas/), exportadas pela tecla **X**.
+
+- **Cenário:** piso de tábuas envelhecidas, papel de parede vitoriano, lambril, teto, tapete, molduras douradas, placas, relógio, teias e os quatro quadros. Em cada superfície, o `repeat` é calculado pelas dimensões reais, para manter a proporção da imagem.
+- **Personagens:** o Zelador usa jeans, flanela xadrez e couro; os Fantasmas usam ectoplasma (uma imagem em tons de cinza multiplicada pela cor de cada um e usada também como `emissiveMap`).
+- **UV em metros:** `uvEmMetros()` reescala as UVs de cilindros, cones, esferas, caixas e tornos para que 1 unidade de UV = 1 m de superfície. Assim, a trama tem o mesmo tamanho em todas as peças, sem esticar.
+- **Relevo:** `mapaRelevo()` gera um bump map a partir da luminância de cada textura (juntas, frisos, vincos), que reage à lanterna e às velas sem adicionar vértices.
+- **Inspeção:** a tecla **U** troca as texturas por uma grade UV rotulada (células quadradas = sem distorção), e `js/inspecaoTexturas.js` desenha os layouts UV das malhas.
 
 | Parede | Quadro |
 |---|---|
@@ -112,8 +121,10 @@ js/main.js          renderizador, câmeras, projeção, luzes, entrada, colisõe
 js/Sala.js          salão: piso, teto, paredes, quadros, porta, colunas, mobília, lustre, luzes
 js/Zelador.js       personagem principal
 js/Fantasma.js      inimigo reutilizável (4 instâncias + Chefe)
-js/texturas.js      texturas procedurais (Canvas 2D)
-capturas/           capturas de tela
+js/texturas.js      texturas procedurais (Canvas 2D), UV em metros e mapas de relevo
+js/inspecaoTexturas.js  grade UV, liga/desliga do relevo, layouts UV e exportação (.zip)
+texturas/           imagens usadas como textura (PNG exportado pela tecla X)
+capturas/           capturas de tela (entrega4/: texturas, grade UV, luzes, relevo e layouts UV)
 entregas/           relatórios de cada entrega
 ```
 
@@ -127,3 +138,4 @@ entregas/           relatórios de cada entrega
 ## Entregas
 
 - [Entrega 02 — Câmeras, perspectiva e iluminação](entregas/entrega2.md)
+- [Entrega 04 — Texturas e materiais](entregas/entrega4.md)

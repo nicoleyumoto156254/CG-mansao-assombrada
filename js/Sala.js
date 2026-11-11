@@ -45,13 +45,13 @@ export function criarSala() {
 
   // =============================================================== PISO/TETO
   const piso = malha(new THREE.PlaneGeometry(LARGURA, PROFUNDIDADE),
-    new THREE.MeshStandardMaterial({ map: T.comRepeticao(tex.piso, 6, 6), roughness: 0.78 }),
+    T.materialTexturizado(T.comRepeticao(tex.piso, 6, 6), { roughness: 0.78, relevo: 2 }),
     [0, 0, 0], [-Math.PI / 2, 0, 0], [1, 1, 1], false);
   piso.name = 'Piso';
   sala.add(piso);
 
   const teto = malha(new THREE.PlaneGeometry(LARGURA, PROFUNDIDADE),
-    new THREE.MeshStandardMaterial({ map: T.comRepeticao(tex.teto, 5, 5), roughness: 0.9 }),
+    T.materialTexturizado(T.comRepeticao(tex.teto, 5, 5), { roughness: 0.9, relevo: 1 }),
     [0, ALTURA, 0], [Math.PI / 2, 0, 0], [1, 1, 1], false);
   teto.name = 'Teto';
   sala.add(teto);
@@ -162,7 +162,7 @@ export function criarSala() {
   }
 
   // Teias de aranha nos 4 cantos superiores
-  const teiaTex = texturaTeia();
+  const teiaTex = T.texturaTeia();
   for (const [x, z] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
     const teia = new THREE.Mesh(new THREE.PlaneGeometry(1.8, 1.8),
       new THREE.MeshBasicMaterial({ map: teiaTex, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false }));
@@ -218,12 +218,12 @@ function criarParede(comp, tex) {
   const ALT_LAMBRIL = 1.2;
   // papel de parede (parte superior) — repetição proporcional ao tamanho real
   const papel = malha(new THREE.PlaneGeometry(comp, ALTURA - ALT_LAMBRIL),
-    new THREE.MeshStandardMaterial({ map: T.comRepeticao(tex.papel, comp / 1.6, (ALTURA - ALT_LAMBRIL) / 3.2), roughness: 0.85 }),
+    T.materialTexturizado(T.comRepeticao(tex.papel, comp / 1.6, (ALTURA - ALT_LAMBRIL) / 3.2), { roughness: 0.85, relevo: 1 }),
     [0, ALT_LAMBRIL + (ALTURA - ALT_LAMBRIL) / 2, 0], [0, 0, 0], [1, 1, 1], false);
   g.add(papel);
   // lambril de madeira entalhada (parte inferior)
   g.add(malha(new THREE.PlaneGeometry(comp, ALT_LAMBRIL),
-    new THREE.MeshStandardMaterial({ map: T.comRepeticao(tex.lambril, Math.round(comp / 2.5), 1), roughness: 0.6 }),
+    T.materialTexturizado(T.comRepeticao(tex.lambril, Math.round(comp / 2.5), 1), { roughness: 0.6, relevo: 2 }),
     [0, ALT_LAMBRIL / 2, 0.03], [0, 0, 0], [1, 1, 1], false));
   // rodapé, guarnição do lambril e sanca (molduras em caixa)
   g.add(malha(new THREE.BoxGeometry(comp, 0.18, 0.06), madeiraEscura, [0, 0.09, 0.05], [0, 0, 0], [1, 1, 1], false));
@@ -239,16 +239,21 @@ function criarQuadro(titulo, texPintura, texMoldura) {
   g.name = 'Quadro: ' + titulo;
   const W = 2.2, H = 2.75, B = 0.24, D = 0.14, CY = 3.25;
   g.position.set(0, CY, 0);
-  // tela
-  g.add(malha(new THREE.PlaneGeometry(W, H), new THREE.MeshStandardMaterial({ map: texPintura, roughness: 0.55 }), [0, 0, 0.035], [0, 0, 0], [1, 1, 1], false));
-  // moldura dourada: 4 barras com a mesma textura (rotacionada nas laterais)
-  const matH = new THREE.MeshStandardMaterial({ map: T.comRepeticao(texMoldura, 3, 1), metalness: 0.75, roughness: 0.35 });
-  const tV = T.comRepeticao(texMoldura, 3, 1); tV.center.set(0.5, 0.5); tV.rotation = Math.PI / 2;
-  const matV = new THREE.MeshStandardMaterial({ map: tV, metalness: 0.75, roughness: 0.35 });
-  g.add(malha(new THREE.BoxGeometry(W + 2 * B, B, D), matH, [0, H / 2 + B / 2, D / 2]));
-  g.add(malha(new THREE.BoxGeometry(W + 2 * B, B, D), matH, [0, -H / 2 - B / 2, D / 2]));
-  g.add(malha(new THREE.BoxGeometry(B, H, D), matV, [-W / 2 - B / 2, 0, D / 2]));
-  g.add(malha(new THREE.BoxGeometry(B, H, D), matV, [W / 2 + B / 2, 0, D / 2]));
+  // tela (relevo leve: pinceladas e craquelado do verniz reagem à luz)
+  g.add(malha(new THREE.PlaneGeometry(W, H), T.materialTexturizado(texPintura, { roughness: 0.55, relevo: 0.5 }), [0, 0, 0.035], [0, 0, 0], [1, 1, 1], false));
+  // moldura dourada: 4 barras com a mesma textura. As UVs das caixas ficam em
+  // metros (uvEmMetros), então cada face — inclusive as laterais finas — mostra
+  // o friso no tamanho real: 1 ladrilho = B × 4B (a imagem é 4:1). Nas barras
+  // verticais a textura gira 90° para o friso acompanhar o comprimento.
+  const tH = T.comRepeticao(texMoldura, 1 / (4 * B), 1 / B);
+  const tV = T.comRepeticao(texMoldura, 1 / (4 * B), 1 / B); tV.center.set(0.5, 0.5); tV.rotation = Math.PI / 2;
+  const matH = T.materialTexturizado(tH, { metalness: 0.75, roughness: 0.35, relevo: 2 });
+  const matV = T.materialTexturizado(tV, { metalness: 0.75, roughness: 0.35, relevo: 2 });
+  const barra = (w, h) => T.uvEmMetros(new THREE.BoxGeometry(w, h, D));
+  g.add(malha(barra(W + 2 * B, B), matH, [0, H / 2 + B / 2, D / 2]));
+  g.add(malha(barra(W + 2 * B, B), matH, [0, -H / 2 - B / 2, D / 2]));
+  g.add(malha(barra(B, H), matV, [-W / 2 - B / 2, 0, D / 2]));
+  g.add(malha(barra(B, H), matV, [W / 2 + B / 2, 0, D / 2]));
   // filete interno escuro (dá profundidade à moldura)
   const fil = new THREE.MeshStandardMaterial({ color: 0x2a1c08, metalness: 0.6, roughness: 0.5 });
   for (const [w, h, x, y] of [[W, 0.04, 0, H / 2], [W, 0.04, 0, -H / 2], [0.04, H, -W / 2, 0], [0.04, H, W / 2, 0]])
@@ -483,32 +488,4 @@ function criarLustre(luzesVela) {
   luzesVela.push({ luz, base: luz.intensity, fase: 0 });
   g.userData.luz = luz;   // referência para o controle de luzes (main.js)
   return g;
-}
-
-// =================================================================== TEIA
-function texturaTeia() {
-  const S = 512;
-  const c = document.createElement('canvas'); c.width = c.height = S;
-  const g = c.getContext('2d');
-  g.strokeStyle = 'rgba(230,230,240,0.85)'; g.lineWidth = 1.4;
-  const cx = S / 2, cy = 0; // ancorada na borda superior (canto do teto)
-  const raios = 11;
-  for (let i = 0; i <= raios; i++) {
-    const a = Math.PI * (i / raios);
-    g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(a) * S * 0.7, cy + Math.sin(a) * S * 0.7); g.stroke();
-  }
-  g.lineWidth = 1;
-  for (let k = 1; k < 9; k++) {
-    const rr = k * 30 + k * k * 1.5;
-    g.beginPath();
-    for (let i = 0; i <= raios; i++) {
-      const a = Math.PI * (i / raios), sag = 0.92;
-      const x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr;
-      if (i === 0) g.moveTo(x, y);
-      else { const am = Math.PI * ((i - 0.5) / raios); g.quadraticCurveTo(cx + Math.cos(am) * rr * sag, cy + Math.sin(am) * rr * sag, x, y); }
-    }
-    g.stroke();
-  }
-  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
-  return t;
 }

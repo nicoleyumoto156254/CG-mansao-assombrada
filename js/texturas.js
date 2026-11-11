@@ -20,13 +20,17 @@ function criarCanvas(w, h) {
   return [c, c.getContext('2d')];
 }
 
-function paraTextura(canvas, { repetir = false, cor = true } = {}) {
+// `nome` identifica a imagem: é o nome do arquivo PNG na exportação (tecla X)
+function paraTextura(canvas, { nome, repetir = false, cor = true } = {}) {
   const t = new THREE.CanvasTexture(canvas);
+  t.name = nome;
   if (cor) t.colorSpace = THREE.SRGBColorSpace;
   if (repetir) { t.wrapS = t.wrapT = THREE.RepeatWrapping; }
   t.anisotropy = 8;
   return t;
 }
+
+const slug = (s) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '');
 
 // Clona a textura com repetição própria (compartilha a mesma imagem na GPU)
 export function comRepeticao(tex, rx, ry) {
@@ -34,6 +38,114 @@ export function comRepeticao(tex, rx, ry) {
   t.repeat.set(rx, ry);
   t.needsUpdate = true;
   return t;
+}
+
+// Repetição para geometrias com UV em metros: um ladrilho da imagem cobre
+// `ladrilho` metros da superfície (ver uvEmMetros abaixo)
+export function porMetro(tex, ladrilho) {
+  return comRepeticao(tex, 1 / ladrilho, 1 / ladrilho);
+}
+
+// ===========================================================================
+// MAPEAMENTO UV EM METROS
+// As geometrias do Three.js geram UVs no intervalo [0, 1] por superfície: um
+// cilindro fino e um grosso recebem a textura inteira, então o mesmo tecido
+// ficaria esticado num e comprimido no outro. uvEmMetros() reescala as UVs
+// para que 1 unidade de UV = 1 metro medido sobre a superfície. Assim, com
+// repeat = 1 / tamanho_do_ladrilho, todas as peças de um personagem mostram a
+// trama na mesma escala (densidade de texels uniforme, sem distorção).
+// ===========================================================================
+export function uvEmMetros(geo) {
+  const uv = geo.attributes.uv, p = geo.parameters;
+  const escala = (i, su, sv) => uv.setXY(i, uv.getX(i) * su, uv.getY(i) * sv);
+  switch (geo.type) {
+    case 'ConeGeometry':      // cone = cilindro com raio do topo 0
+    case 'CylinderGeometry': {
+      const rTopo = p.radiusTop ?? 0, rBase = p.radiusBottom ?? p.radius;
+      // lateral: u percorre o arco (raio × ângulo), v percorre a altura
+      const nLado = (p.radialSegments + 1) * (p.heightSegments + 1);
+      const arco = Math.max(rTopo, rBase) * p.thetaLength;
+      for (let i = 0; i < nLado; i++) escala(i, arco, p.height);
+      // tampas: UV planar no intervalo [0, 1] sobre o diâmetro
+      let i = nLado;
+      for (const r of [rTopo, rBase]) {
+        if (p.openEnded || r <= 0) continue;
+        for (let k = 0; k < 2 * p.radialSegments + 1; k++, i++) escala(i, 2 * r, 2 * r);
+      }
+      break;
+    }
+    case 'SphereGeometry': // u: longitude (raio × φ); v: latitude (raio × θ)
+      for (let i = 0; i < uv.count; i++) escala(i, p.radius * p.phiLength, p.radius * p.thetaLength);
+      break;
+    case 'BoxGeometry': { // cada face usa as duas dimensões que ela realmente tem
+      const n = geo.attributes.normal, { width: w, height: h, depth: d } = p;
+      for (let i = 0; i < uv.count; i++) {
+        if (Math.abs(n.getX(i)) > 0.5) escala(i, d, h);
+        else if (Math.abs(n.getY(i)) > 0.5) escala(i, w, d);
+        else escala(i, w, h);
+      }
+      break;
+    }
+    case 'LatheGeometry': {
+      // u: circunferência no maior raio; v: comprimento de arco do perfil
+      // (o Three.js usa v = índice do ponto, que não é proporcional ao arco)
+      const pts = p.points, arcos = [0];
+      for (let j = 1; j < pts.length; j++) arcos.push(arcos[j - 1] + pts[j].distanceTo(pts[j - 1]));
+      const rMax = Math.max(...pts.map((v) => v.x));
+      for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * rMax * p.phiLength, arcos[i % pts.length]);
+      break;
+    }
+    default:
+      return geo; // demais geometrias mantêm as UVs originais
+  }
+  uv.needsUpdate = true;
+  return geo;
+}
+
+// ===========================================================================
+// MAPA DE RELEVO (bump map)
+// Derivado da luminância da própria textura de cor: regiões escuras (juntas
+// do piso, frisos, vincos do couro) viram "baixos" e as claras viram "altos".
+// O shader perturba a normal pelo gradiente desse mapa, então a luz rasante da
+// lanterna e das velas revela o relevo sem acrescentar nenhum vértice.
+// A imagem em tons de cinza é gerada uma vez por textura de origem; as cópias
+// herdam repeat / offset / rotação, para casar texel a texel com o `map`.
+// ===========================================================================
+const relevos = new WeakMap();
+export function mapaRelevo(tex) {
+  let base = relevos.get(tex.source);
+  if (!base) {
+    const img = tex.image, W = img.width, H = img.height;
+    const [c, g] = criarCanvas(W, H);
+    g.drawImage(img, 0, 0);
+    const d = g.getImageData(0, 0, W, H), px = d.data;
+    let min = 255, max = 0;
+    for (let i = 0; i < px.length; i += 4) {
+      const l = 0.299 * px[i] + 0.587 * px[i + 1] + 0.114 * px[i + 2];
+      px[i] = l; min = Math.min(min, l); max = Math.max(max, l);
+    }
+    const k = 255 / Math.max(1, max - min);  // normaliza para usar toda a faixa 0–255
+    for (let i = 0; i < px.length; i += 4) px[i] = px[i + 1] = px[i + 2] = (px[i] - min) * k;
+    g.putImageData(d, 0, 0);
+    base = paraTextura(c, { nome: tex.name + '_relevo', cor: false });
+    relevos.set(tex.source, base);
+  }
+  return copiarMapeamento(tex, base.clone());
+}
+
+// Copia de `de` para `para` tudo o que define onde a imagem cai sobre as UVs
+export function copiarMapeamento(de, para) {
+  para.wrapS = de.wrapS; para.wrapT = de.wrapT;
+  para.repeat.copy(de.repeat); para.offset.copy(de.offset);
+  para.center.copy(de.center); para.rotation = de.rotation;
+  return para;
+}
+
+// Material PBR com textura de cor e, opcionalmente, relevo (`relevo` = bumpScale)
+export function materialTexturizado(tex, { relevo = 0, ...props } = {}) {
+  const m = new THREE.MeshStandardMaterial({ map: tex, ...props });
+  if (relevo > 0) { m.bumpMap = mapaRelevo(tex); m.bumpScale = relevo; }
+  return m;
 }
 
 // ---------------------------------------------------------------------------
@@ -98,7 +210,7 @@ export function texturaPiso() {
     g.fillStyle = 'rgba(10,5,2,1)';
     g.fillRect(x0, 0, 3, S);
   }
-  return paraTextura(c, { repetir: true });
+  return paraTextura(c, { nome: 'piso', repetir: true });
 }
 
 // ---------------------------------------------------------------------------
@@ -156,7 +268,7 @@ export function texturaPapelParede() {
     g.ellipse(r() * W, r() * H, 20 + r() * 60, 20 + r() * 90, 0, 0, Math.PI * 2);
     g.fill();
   }
-  return paraTextura(c, { repetir: true });
+  return paraTextura(c, { nome: 'papel_parede', repetir: true });
 }
 
 // ---------------------------------------------------------------------------
@@ -186,7 +298,7 @@ export function texturaLambril() {
     g.strokeStyle = 'rgba(200,150,80,0.35)'; g.lineWidth = 2;
     g.strokeRect(x + 22, y + 22, w - 44, h - 44);
   }
-  return paraTextura(c, { repetir: true });
+  return paraTextura(c, { nome: 'lambril', repetir: true });
 }
 
 // ---------------------------------------------------------------------------
@@ -223,7 +335,7 @@ export function texturaMoldura() {
     g.fillStyle = `rgba(30,20,5,${r() * 0.25})`;
     g.fillRect(r() * W, r() * H, 2 + r() * 10, 1 + r() * 4);
   }
-  return paraTextura(c, { repetir: true });
+  return paraTextura(c, { nome: 'moldura', repetir: true });
 }
 
 // ---------------------------------------------------------------------------
@@ -237,7 +349,7 @@ export function texturaTeto() {
   g.strokeStyle = 'rgba(160,110,50,0.4)'; g.lineWidth = 4;
   g.strokeRect(60, 60, S - 120, S - 120);
   g.fillStyle = 'rgba(0,0,0,0.5)'; g.fillRect(40, 40, S - 80, 10); g.fillRect(40, 40, 10, S - 80);
-  return paraTextura(c, { repetir: true });
+  return paraTextura(c, { nome: 'teto', repetir: true });
 }
 
 // ---------------------------------------------------------------------------
@@ -275,7 +387,7 @@ export function texturaTapete() {
   g.textAlign = 'center'; g.textBaseline = 'middle';
   g.fillText('N', 0, -400); g.fillText('S', 0, 400); g.fillText('L', 400, 0); g.fillText('O', -400, 0);
   g.restore();
-  return paraTextura(c);
+  return paraTextura(c, { nome: 'tapete' });
 }
 
 // ---------------------------------------------------------------------------
@@ -340,7 +452,7 @@ export function quadroConde() {
   g.beginPath(); g.moveTo(238, 298); g.lineTo(242, 314); g.lineTo(246, 299); g.fill();
   g.beginPath(); g.moveTo(266, 299); g.lineTo(270, 314); g.lineTo(274, 298); g.fill();
   craquelado(g, W, H, 21);
-  return paraTextura(c);
+  return paraTextura(c, { nome: 'quadro_conde' });
 }
 
 // II. Floresta da Lua Cheia — paisagem noturna com árvores retorcidas
@@ -388,7 +500,7 @@ export function quadroFloresta() {
     g.restore();
   }
   craquelado(g, W, H, 22);
-  return paraTextura(c);
+  return paraTextura(c, { nome: 'quadro_floresta' });
 }
 
 // III. Memento Mori — natureza-morta sombria com crânio e vela
@@ -436,7 +548,7 @@ export function quadroMementoMori() {
   g.fillStyle = '#c9a25a';
   g.beginPath(); g.moveTo(262, 458); g.lineTo(298, 458); g.lineTo(280, 438); g.fill();
   craquelado(g, W, H, 23);
-  return paraTextura(c);
+  return paraTextura(c, { nome: 'quadro_memento_mori' });
 }
 
 // IV. Castelo da Tempestade — fortaleza sob raios na montanha
@@ -486,7 +598,7 @@ export function quadroCastelo() {
     g.beginPath(); g.moveTo(x, y); g.lineTo(x - 6, y + 18); g.stroke();
   }
   craquelado(g, W, H, 24);
-  return paraTextura(c);
+  return paraTextura(c, { nome: 'quadro_castelo' });
 }
 
 // Placa de título dourada abaixo de cada quadro
@@ -499,7 +611,7 @@ export function texturaPlaca(texto) {
   g.fillStyle = '#e8cb84'; g.font = 'italic bold 36px Georgia, serif';
   g.textAlign = 'center'; g.textBaseline = 'middle';
   g.fillText(texto, 256, 50);
-  return paraTextura(c);
+  return paraTextura(c, { nome: 'placa_' + slug(texto) });
 }
 
 // Mostrador de relógio (algarismos romanos)
@@ -514,7 +626,7 @@ export function texturaMostrador() {
     const a = i * Math.PI / 6 - Math.PI / 2;
     g.fillText(t, C + Math.cos(a) * 98, C + Math.sin(a) * 98);
   });
-  return paraTextura(c);
+  return paraTextura(c, { nome: 'mostrador_relogio' });
 }
 
 // Manômetro do aspirador
@@ -529,7 +641,7 @@ export function texturaManometro() {
   }
   g.strokeStyle = '#c0261f'; g.lineWidth = 5;
   g.beginPath(); g.arc(C, C, 52, Math.PI * 1.85, Math.PI * 2.25); g.stroke();
-  return paraTextura(c);
+  return paraTextura(c, { nome: 'manometro' });
 }
 
 // Faixas da mangueira corrugada
@@ -538,7 +650,7 @@ export function texturaCorrugada() {
   const grd = g.createLinearGradient(0, 0, 64, 0);
   grd.addColorStop(0, '#2a2d33'); grd.addColorStop(0.5, '#6c717c'); grd.addColorStop(1, '#2a2d33');
   g.fillStyle = grd; g.fillRect(0, 0, 64, 64);
-  return paraTextura(c, { repetir: true });
+  return paraTextura(c, { nome: 'mangueira_corrugada', repetir: true });
 }
 
 // Gradiente de alfa para o cone volumétrico da lanterna
@@ -549,7 +661,7 @@ export function texturaGradienteCone() {
   grd.addColorStop(0, '#fff');
   grd.addColorStop(1, '#000');
   g.fillStyle = grd; g.fillRect(0, 0, 4, 256);
-  return paraTextura(c, { cor: false });
+  return paraTextura(c, { nome: 'cone_lanterna_alfa', cor: false });
 }
 
 // Emblema do boné do zelador
@@ -559,5 +671,195 @@ export function texturaEmblema() {
   g.strokeStyle = '#1f5e2c'; g.lineWidth = 8; g.stroke();
   g.fillStyle = '#1f5e2c'; g.font = 'bold 76px Georgia, serif'; g.textAlign = 'center'; g.textBaseline = 'middle';
   g.fillText('Z', 64, 70);
-  return paraTextura(c);
+  return paraTextura(c, { nome: 'emblema_bone' });
+}
+
+// Teia de aranha (cantos do teto) — fundo transparente
+export function texturaTeia() {
+  const S = 512;
+  const [c, g] = criarCanvas(S, S);
+  g.strokeStyle = 'rgba(230,230,240,0.85)'; g.lineWidth = 1.4;
+  const cx = S / 2, cy = 0; // ancorada na borda superior (canto do teto)
+  const raios = 11;
+  for (let i = 0; i <= raios; i++) {
+    const a = Math.PI * (i / raios);
+    g.beginPath(); g.moveTo(cx, cy); g.lineTo(cx + Math.cos(a) * S * 0.7, cy + Math.sin(a) * S * 0.7); g.stroke();
+  }
+  g.lineWidth = 1;
+  for (let k = 1; k < 9; k++) {
+    const rr = k * 30 + k * k * 1.5;
+    g.beginPath();
+    for (let i = 0; i <= raios; i++) {
+      const a = Math.PI * (i / raios), sag = 0.92;
+      const x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr;
+      if (i === 0) g.moveTo(x, y);
+      else { const am = Math.PI * ((i - 0.5) / raios); g.quadraticCurveTo(cx + Math.cos(am) * rr * sag, cy + Math.sin(am) * rr * sag, x, y); }
+    }
+    g.stroke();
+  }
+  return paraTextura(c, { nome: 'teia' });
+}
+
+// ===========================================================================
+// TEXTURAS DOS PERSONAGENS — todas são ladrilháveis (as bordas se encaixam),
+// porque são repetidas sobre as UVs em metros (ver uvEmMetros).
+// ===========================================================================
+
+// Desenha `fn` também deslocado de ±W/±H para que formas que cruzam a borda
+// reapareçam do outro lado (textura sem emenda visível ao repetir).
+function emLaco(W, H, fn) {
+  for (const dx of [-W, 0, W]) for (const dy of [-H, 0, H]) fn(dx, dy);
+}
+
+// JEANS — sarja diagonal (trama 3×1) com fios claros da trama e desbotado
+export function texturaJeans() {
+  const S = 256;
+  const [c, g] = criarCanvas(S, S);
+  const r = rng(41);
+  g.fillStyle = '#2b4c82'; g.fillRect(0, 0, S, S);
+  // manchas suaves de desbotado
+  for (let i = 0; i < 18; i++) {
+    const x = r() * S, y = r() * S, raio = 20 + r() * 50, a = 0.05 + r() * 0.08;
+    emLaco(S, S, (dx, dy) => {
+      const grd = g.createRadialGradient(x + dx, y + dy, 0, x + dx, y + dy, raio);
+      grd.addColorStop(0, `rgba(170,195,230,${a})`); grd.addColorStop(1, 'rgba(170,195,230,0)');
+      g.fillStyle = grd; g.fillRect(x + dx - raio, y + dy - raio, raio * 2, raio * 2);
+    });
+  }
+  // sarja: diagonais a 45° com período 8 px (divide 256 ⇒ ladrilhável)
+  g.lineWidth = 2.2;
+  for (let k = -S; k < 2 * S; k += 8) {
+    g.strokeStyle = 'rgba(12,24,52,0.55)';
+    g.beginPath(); g.moveTo(k, 0); g.lineTo(k + S, S); g.stroke();
+    g.strokeStyle = 'rgba(120,150,200,0.25)';
+    g.beginPath(); g.moveTo(k + 3, 0); g.lineTo(k + 3 + S, S); g.stroke();
+  }
+  // fios brancos da trama aparecendo
+  for (let i = 0; i < 1400; i++) {
+    g.fillStyle = `rgba(220,230,245,${0.08 + r() * 0.18})`;
+    g.fillRect(r() * S, r() * S, 1 + r() * 2, 1);
+  }
+  return paraTextura(c, { nome: 'jeans', repetir: true });
+}
+
+// FLANELA — xadrez verde (camisa do zelador) com textura de fibra
+export function texturaFlanela() {
+  const S = 256;
+  const [c, g] = criarCanvas(S, S);
+  const r = rng(77);
+  g.fillStyle = '#2f8a3e'; g.fillRect(0, 0, S, S);
+  // faixas (largura, posição, cor) repetidas na horizontal e na vertical
+  const faixas = [[64, 0, 'rgba(12,45,20,0.55)'], [18, 96, 'rgba(10,20,12,0.6)'], [6, 140, 'rgba(240,215,120,0.55)'],
+    [30, 176, 'rgba(12,45,20,0.45)'], [4, 224, 'rgba(10,20,12,0.7)']];
+  for (const [w, p, cor] of faixas) {
+    g.fillStyle = cor;
+    g.fillRect(p, 0, w, S);   // verticais
+    g.fillRect(0, p, S, w);   // horizontais (o cruzamento escurece, como no tecido)
+  }
+  // fibras felpudas
+  for (let i = 0; i < 2600; i++) {
+    const x = r() * S, y = r() * S, a = r() * Math.PI, l = 2 + r() * 4;
+    g.strokeStyle = r() < 0.5 ? 'rgba(255,255,255,0.07)' : 'rgba(0,0,0,0.09)';
+    g.lineWidth = 1;
+    g.beginPath(); g.moveTo(x, y); g.lineTo(x + Math.cos(a) * l, y + Math.sin(a) * l); g.stroke();
+  }
+  return paraTextura(c, { nome: 'flanela', repetir: true });
+}
+
+// COURO — grão irregular, vincos e arranhões (botas e cinto)
+export function texturaCouro() {
+  const S = 256;
+  const [c, g] = criarCanvas(S, S);
+  const r = rng(5);
+  g.fillStyle = '#4a2a14'; g.fillRect(0, 0, S, S);
+  // poros do grão: pequenas células claras e escuras
+  for (let i = 0; i < 900; i++) {
+    // sorteios fora de emLaco: as cópias nas bordas precisam ser idênticas
+    const x = r() * S, y = r() * S, raio = 2 + r() * 5, achat = 0.5 + r() * 0.5, giro = r() * 3;
+    g.fillStyle = r() < 0.5 ? `rgba(120,75,40,${0.15 + r() * 0.2})` : `rgba(20,8,2,${0.2 + r() * 0.25})`;
+    emLaco(S, S, (dx, dy) => {
+      g.beginPath(); g.ellipse(x + dx, y + dy, raio, raio * achat, giro, 0, 7); g.fill();
+    });
+  }
+  // vincos (linhas escuras sinuosas) e arranhões claros
+  for (let i = 0; i < 26; i++) {
+    const x = r() * S, y = r() * S, a = r() * Math.PI, l = 20 + r() * 60, vinco = i < 16;
+    emLaco(S, S, (dx, dy) => {
+      g.strokeStyle = vinco ? 'rgba(15,6,1,0.5)' : 'rgba(170,120,80,0.35)';
+      g.lineWidth = vinco ? 1.6 : 1;
+      g.beginPath(); g.moveTo(x + dx, y + dy);
+      g.quadraticCurveTo(x + dx + Math.cos(a + 0.6) * l * 0.5, y + dy + Math.sin(a + 0.6) * l * 0.5,
+        x + dx + Math.cos(a) * l, y + dy + Math.sin(a) * l);
+      g.stroke();
+    });
+  }
+  return paraTextura(c, { nome: 'couro', repetir: true });
+}
+
+// ECTOPLASMA — volutas em tons de cinza; o material multiplica pela cor de
+// cada fantasma, então uma única imagem serve para os 4 fantasmas e o Chefe
+export function texturaEctoplasma() {
+  const S = 256;
+  const [c, g] = criarCanvas(S, S);
+  const r = rng(99);
+  g.fillStyle = '#6a6a6a'; g.fillRect(0, 0, S, S);
+  // névoa: bolhas claras e escuras sobrepostas
+  for (let i = 0; i < 60; i++) {
+    const x = r() * S, y = r() * S, raio = 12 + r() * 40, claro = r() < 0.6, a = 0.15 + r() * 0.25;
+    emLaco(S, S, (dx, dy) => {
+      const grd = g.createRadialGradient(x + dx, y + dy, 0, x + dx, y + dy, raio);
+      grd.addColorStop(0, claro ? `rgba(255,255,255,${a})` : `rgba(0,0,0,${a})`);
+      grd.addColorStop(1, 'rgba(128,128,128,0)');
+      g.fillStyle = grd; g.fillRect(x + dx - raio, y + dy - raio, raio * 2, raio * 2);
+    });
+  }
+  // volutas: espirais brilhantes
+  g.lineCap = 'round';
+  for (let i = 0; i < 14; i++) {
+    const x = r() * S, y = r() * S, giro = r() < 0.5 ? 1 : -1, R = 10 + r() * 22;
+    g.strokeStyle = `rgba(255,255,255,${0.35 + r() * 0.3})`; g.lineWidth = 1.5 + r() * 2;
+    emLaco(S, S, (dx, dy) => {
+      g.beginPath();
+      for (let k = 0; k <= 40; k++) {
+        const a = giro * k * 0.25, rr = R * (1 - k / 48);
+        const px = x + dx + Math.cos(a) * rr, py = y + dy + Math.sin(a) * rr;
+        k ? g.lineTo(px, py) : g.moveTo(px, py);
+      }
+      g.stroke();
+    });
+  }
+  return paraTextura(c, { nome: 'ectoplasma', repetir: true });
+}
+
+// ===========================================================================
+// GRADE UV (tecla U) — substitui temporariamente os mapas de cor para mostrar
+// as coordenadas de textura de cada superfície:
+//   • cor da célula: vermelho cresce com u, verde cresce com v;
+//   • rótulo A1…H8: coluna (letra) = u, linha (número) = v, contando de baixo;
+//   • texto espelhado = UV invertida; quadrados viram retângulos = distorção.
+// ===========================================================================
+export function texturaGradeUV() {
+  const S = 1024, N = 8, cel = S / N;
+  const [c, g] = criarCanvas(S, S);
+  for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+    const u = (i + 0.5) / N, v = (j + 0.5) / N, escuro = (i + j) % 2 ? 0.75 : 1;
+    const y = S - (j + 1) * cel;     // v = 0 na base da imagem (flipY do WebGL)
+    g.fillStyle = `rgb(${(40 + u * 215) * escuro | 0},${(40 + v * 215) * escuro | 0},${150 * escuro | 0})`;
+    g.fillRect(i * cel, y, cel, cel);
+    g.fillStyle = 'rgba(0,0,0,0.75)';
+    g.font = 'bold 44px Consolas, monospace'; g.textAlign = 'center'; g.textBaseline = 'middle';
+    g.fillText('ABCDEFGH'[i] + (j + 1), i * cel + cel / 2, y + cel / 2);
+  }
+  // linhas finas a cada 1/32 e grossas a cada 1/8
+  for (let k = 0; k <= 32; k++) {
+    g.strokeStyle = k % 4 ? 'rgba(255,255,255,0.25)' : '#fff';
+    g.lineWidth = k % 4 ? 1 : 4;
+    const p = k * S / 32;
+    g.beginPath(); g.moveTo(p, 0); g.lineTo(p, S); g.moveTo(0, p); g.lineTo(S, p); g.stroke();
+  }
+  // origem (0,0) e sentido dos eixos
+  g.fillStyle = '#fff'; g.font = 'bold 30px Consolas, monospace'; g.textAlign = 'left'; g.textBaseline = 'alphabetic';
+  g.fillText('(0,0)  u →', 10, S - 12);
+  g.save(); g.translate(30, S - 60); g.rotate(-Math.PI / 2); g.fillText('v →', 0, 0); g.restore();
+  return paraTextura(c, { nome: 'grade_uv', repetir: true });
 }

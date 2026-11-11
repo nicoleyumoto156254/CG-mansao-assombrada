@@ -4,8 +4,14 @@
 // Origem: centro do corpo. Frente: eixo +Z local. Altura ≈ 1,3 m (escala 1).
 // ============================================================================
 import * as THREE from 'three';
+import { texturaEctoplasma, porMetro, uvEmMetros } from './texturas.js';
+
+// Uma única imagem em tons de cinza para todos os fantasmas: o material a
+// multiplica pela cor de cada um (map) e a usa para modular o brilho (emissiveMap).
+const ECTO = porMetro(texturaEctoplasma(), 0.4);   // 1 ladrilho = 40 cm
 
 function malha(geo, mat, p = [0, 0, 0], r = [0, 0, 0], s = [1, 1, 1]) {
+  if (mat.map) uvEmMetros(geo);
   const m = new THREE.Mesh(geo, mat);
   m.position.set(...p); m.rotation.set(...r); m.scale.set(...s);
   return m;
@@ -26,12 +32,14 @@ export class Fantasma extends THREE.Group {
     this.alturaBase = 0;
 
     const corpoMat = new THREE.MeshPhysicalMaterial({
-      color: this.cor, emissive: this.cor, emissiveIntensity: 0.35,
+      map: ECTO, emissiveMap: ECTO,
+      color: this.cor, emissive: this.cor, emissiveIntensity: 0.6,
       transparent: true, opacity: 0.55, roughness: 0.25, clearcoat: 0.6,
       side: THREE.DoubleSide, depthWrite: false,
     });
     const membroMat = new THREE.MeshStandardMaterial({
-      color: this.cor, emissive: this.cor, emissiveIntensity: 0.3, transparent: true, opacity: 0.8, roughness: 0.4,
+      map: ECTO, emissiveMap: ECTO,
+      color: this.cor, emissive: this.cor, emissiveIntensity: 0.5, transparent: true, opacity: 0.8, roughness: 0.4,
     });
     const metal = new THREE.MeshStandardMaterial({ color: 0x6d6f78, metalness: 0.9, roughness: 0.35 });
     const preto = new THREE.MeshBasicMaterial({ color: 0x050208 });

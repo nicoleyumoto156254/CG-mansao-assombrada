@@ -4,15 +4,26 @@
 // Unidade: 1 unidade = 1 metro. Altura total ≈ 1,86 m (com o boné).
 // ============================================================================
 import * as THREE from 'three';
-import { texturaManometro, texturaCorrugada, texturaGradienteCone, texturaEmblema } from './texturas.js';
+import {
+  texturaManometro, texturaCorrugada, texturaGradienteCone, texturaEmblema,
+  texturaJeans, texturaFlanela, texturaCouro, porMetro, materialTexturizado, uvEmMetros,
+} from './texturas.js';
 
 // ---------------------------------------------------------------- materiais
+// Tecidos e couro: as malhas que os usam têm UV em metros (uvEmMetros), então
+// o ladrilho tem o mesmo tamanho real na perna, no braço e no peitilho.
+const TEX = {
+  jeans:   porMetro(texturaJeans(), 0.12),    // 1 ladrilho = 12 cm
+  flanela: porMetro(texturaFlanela(), 0.2),   // 1 xadrez = 20 cm
+  couro:   porMetro(texturaCouro(), 0.1),
+};
 const M = {
   pele:     new THREE.MeshStandardMaterial({ color: 0xf0c49c, roughness: 0.65 }),
-  camisa:   new THREE.MeshStandardMaterial({ color: 0x2f8a3e, roughness: 0.8 }),
-  jeans:    new THREE.MeshStandardMaterial({ color: 0x2d4f86, roughness: 0.9 }),
-  jeansEsc: new THREE.MeshStandardMaterial({ color: 0x223c68, roughness: 0.9 }),
-  couro:    new THREE.MeshStandardMaterial({ color: 0x4a2a14, roughness: 0.55 }),
+  camisa:   materialTexturizado(TEX.flanela, { roughness: 0.85, relevo: 0.6 }),
+  bone:     new THREE.MeshStandardMaterial({ color: 0x2f8a3e, roughness: 0.8 }),
+  jeans:    materialTexturizado(TEX.jeans, { roughness: 0.9, relevo: 1 }),
+  jeansEsc: materialTexturizado(TEX.jeans, { color: 0xa0a8b8, roughness: 0.9, relevo: 1 }), // mesma trama, mais escura
+  couro:    materialTexturizado(TEX.couro, { roughness: 0.55, relevo: 1.5 }),
   sola:     new THREE.MeshStandardMaterial({ color: 0x151515, roughness: 0.95 }),
   latao:    new THREE.MeshStandardMaterial({ color: 0xd4a843, metalness: 0.9, roughness: 0.3 }),
   metal:    new THREE.MeshStandardMaterial({ color: 0x9aa3ad, metalness: 0.85, roughness: 0.32 }),
@@ -30,6 +41,7 @@ const M = {
 
 // Atalho: cria uma malha já posicionada e projetando sombra
 function malha(geo, mat, p = [0, 0, 0], r = [0, 0, 0], s = [1, 1, 1]) {
+  if (mat.map) uvEmMetros(geo);   // texturas repetidas por metro de superfície
   const m = new THREE.Mesh(geo, mat);
   m.position.set(...p); m.rotation.set(...r); m.scale.set(...s);
   m.castShadow = true; m.receiveShadow = true;
@@ -191,11 +203,11 @@ export class Zelador extends THREE.Group {
 
   #bone(cabeca) {
     const b = grupo('hatGroup', [0, 0.235, 0]);
-    b.add(malha(new THREE.SphereGeometry(0.152, 28, 12, 0, Math.PI * 2, 0, Math.PI / 2), M.camisa, [0, 0, 0], [0, 0, 0], [1, 0.72, 1]));
+    b.add(malha(new THREE.SphereGeometry(0.152, 28, 12, 0, Math.PI * 2, 0, Math.PI / 2), M.bone, [0, 0, 0], [0, 0, 0], [1, 0.72, 1]));
     b.add(malha(new THREE.CylinderGeometry(0.153, 0.153, 0.028, 28, 1, true), M.couro, [0, 0.012, 0]));
-    b.add(malha(new THREE.SphereGeometry(0.018, 10, 8), M.camisa, [0, 0.11, 0]));
+    b.add(malha(new THREE.SphereGeometry(0.018, 10, 8), M.bone, [0, 0.11, 0]));
     // aba frontal curva: meio-disco levemente inclinado
-    b.add(malha(new THREE.CylinderGeometry(0.155, 0.155, 0.012, 24, 1, false, -Math.PI / 2, Math.PI), M.camisa,
+    b.add(malha(new THREE.CylinderGeometry(0.155, 0.155, 0.012, 24, 1, false, -Math.PI / 2, Math.PI), M.bone,
       [0, -0.002, 0.03], [0.14, 0, 0], [1, 1, 1.3]));
     const emb = new THREE.Mesh(new THREE.CircleGeometry(0.036, 24),
       new THREE.MeshStandardMaterial({ map: texturaEmblema(), roughness: 0.6 }));
@@ -345,8 +357,10 @@ export class Zelador extends THREE.Group {
       sob.rotation.z = sob.userData.lado * (this.succao ? -0.35 : 0.12);
       sob.position.y = this.succao ? 0.258 : 0.25;
     }
-    // modulação tonal da lanterna no modo de sucção
-    const cor = this.succao ? 0xb6ffd2 : 0xfff1d0;
+    // modulação tonal da lanterna no modo de sucção; o cone volumétrico e a
+    // lente só aparecem acesos quando a SpotLight está ligada (tecla 4)
+    this.cone.visible = this.spot.visible;
+    const cor = !this.spot.visible ? 0x222222 : this.succao ? 0xb6ffd2 : 0xfff1d0;
     this.spot.color.setHex(cor);
     this.cone.material.color.setHex(this.succao ? 0x9effc4 : 0xfff0c0);
     this.lente.material.color.setHex(cor);

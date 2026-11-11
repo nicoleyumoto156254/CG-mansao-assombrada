@@ -6,6 +6,7 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { criarSala } from './Sala.js';
 import { Zelador } from './Zelador.js';
 import { Fantasma } from './Fantasma.js';
+import { criarModoUV, criarAlternadorRelevo, layoutUV, imagensDaCena, baixarZip } from './inspecaoTexturas.js';
 
 // ------------------------------------------------------------- renderizador
 const renderer = new THREE.WebGLRenderer({ antialias: true, preserveDrawingBuffer: true });
@@ -166,6 +167,36 @@ function atualizarPainel() {
   document.getElementById('painel-corpo').innerHTML = linhas.join('');
 }
 
+// ---------------------------------------------- texturas: grade UV e exportação
+// U: troca as texturas de cor pela grade UV (mostra as coordenadas de textura).
+// R: liga/desliga os mapas de relevo (bump) para comparar o efeito da luz.
+// X: baixa um .zip com os PNGs das texturas usadas + grade UV + layouts UV.
+const modoUV = criarModoUV(scene);
+const relevo = criarAlternadorRelevo(scene);
+function atualizarHudTexturas() {
+  document.getElementById('hud-texturas').textContent =
+    (modoUV.ativo ? 'grade UV' : 'normais') + ' · relevo ' + (relevo.ativo ? 'ON' : 'OFF');
+}
+function alternarUV() { modoUV.alternar(); atualizarHudTexturas(); }
+function alternarRelevo() { relevo.alternar(); atualizarHudTexturas(); }
+// Malhas cujo layout UV é desenhado sobre a imagem (uma de cada tipo de geometria)
+const quadroNorte = sala.grupo.getObjectByName('Quadro: I. O Conde Sombrio');
+const AMOSTRAS_UV = [
+  ['piso', sala.grupo.getObjectByName('Piso'), 'Piso — PlaneGeometry 20 × 20 m'],
+  ['quadro_tela', quadroNorte.children[0], 'Tela do quadro Norte — PlaneGeometry 2,2 × 2,75 m'],
+  ['moldura_barra', quadroNorte.children[1], 'Barra superior da moldura — BoxGeometry'],
+  ['zelador_coxa', zelador.pernaEsq.quadril.children[1], 'Coxa do Zelador — CylinderGeometry (UV em metros)'],
+  ['fantasma_corpo', fantasmas[0].casca, 'Corpo do Fantasma — LatheGeometry (UV em metros)'],
+];
+function imagensParaExportar() {
+  if (modoUV.ativo) alternarUV();   // exporta as texturas reais, não a grade
+  return [
+    ...imagensDaCena(scene),
+    { nome: 'grade_uv', canvas: modoUV.grade.image },
+    ...AMOSTRAS_UV.map(([nome, malha, titulo]) => ({ nome: 'uv_' + nome, canvas: layoutUV(malha, titulo) })),
+  ];
+}
+
 // ------------------------------------------------------------------ entrada
 const teclas = new Set();
 addEventListener('keydown', (e) => {
@@ -176,6 +207,9 @@ addEventListener('keydown', (e) => {
   if (e.code === 'KeyP') alternarFov();
   if (e.code === 'KeyH') alternarAjudantes();
   if (e.code === 'KeyB') chefe.visible = !chefe.visible;
+  if (e.code === 'KeyU') alternarUV();
+  if (e.code === 'KeyR') alternarRelevo();
+  if (e.code === 'KeyX') baixarZip(imagensParaExportar(), 'texturas_mansao_assombrada.zip');
   if (e.code === 'Space') e.preventDefault();
 });
 addEventListener('keyup', (e) => teclas.delete(e.code));
@@ -260,6 +294,7 @@ addEventListener('resize', () => {
 
 definirModo('terceira');
 atualizarHudLuzes();
+atualizarHudTexturas();
 requestAnimationFrame(quadro);
 
 // Acesso pelo console do navegador (útil para depurar e gerar capturas)
@@ -267,4 +302,4 @@ requestAnimationFrame(quadro);
 function passo(n = 1, dtSimulado = 1 / 30) {
   for (let i = 0; i < n; i++) { anterior -= dtSimulado * 1000; quadro(performance.now()); }
 }
-window.__cena = { scene, camera, renderer, zelador, fantasmas, chefe, orbit, definirModo, alternarAjudantes, atualizarPainel, passo };
+window.__cena = { scene, camera, renderer, zelador, fantasmas, chefe, orbit, definirModo, alternarAjudantes, atualizarPainel, passo, alternarUV, alternarRelevo, imagensParaExportar };
