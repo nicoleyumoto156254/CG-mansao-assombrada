@@ -200,34 +200,3 @@ Capturas, todas com o mesmo enquadramento:
 | `js/main.js`, `index.html` | Teclas **U**, **R**, **X** e indicação das texturas no HUD. |
 | `texturas/` (novo) | 37 PNGs: as imagens usadas como textura. |
 | `capturas/entrega4/` (novo) | 14 capturas e 5 layouts UV. |
-
----
-
-## Enunciado da entrega
-
-> **Texturas e materiais**
->
-> Aplicar texturas aos personagens, objetos e elementos do cenário, explorando os recursos de mapeamento de texturas na construção visual do jogo.
->
-> O grupo deverá entregar:
->
-> **Aplicação de múltiplas texturas**
-> - Utilizar pelo menos três texturas diferentes no projeto.
-> - Aplicar texturas em diferentes objetos da cena, incluindo personagens e elementos do cenário.
-> - Demonstrar que as texturas estão corretamente mapeadas sobre as superfícies dos objetos.
-> - As texturas devem ser coerentes com a proposta visual do jogo.
->
-> **Mapeamento de texturas**
-> - Apresentar as coordenadas de textura (coordenadas UV) utilizadas nos modelos.
-> - Demonstrar o resultado do mapeamento nos objetos 3D.
-> - Evitar aplicações em que a textura fique excessivamente distorcida ou não corresponda à geometria do objeto.
->
-> **Integração com a iluminação**
-> - Manter as fontes de luz implementadas na entrega anterior.
-> - Demonstrar como a iluminação interage com os objetos texturizados.
-> - Apresentar um resultado visual em que seja possível perceber tanto as texturas quanto os efeitos da iluminação.
->
-> **Demonstração técnica**
-> - Apresentar uma execução funcional do projeto.
-> - Mostrar os diferentes objetos com suas respectivas texturas.
-> - Entregar os arquivos-fonte atualizados e os arquivos de imagem utilizados como texturas, juntamente com um relatório comentando a evolução em comparação com a última entrega.

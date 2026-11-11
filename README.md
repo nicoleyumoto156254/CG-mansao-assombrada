@@ -124,7 +124,7 @@ js/Fantasma.js      inimigo reutilizável (4 instâncias + Chefe)
 js/texturas.js      texturas procedurais (Canvas 2D), UV em metros e mapas de relevo
 js/inspecaoTexturas.js  grade UV, liga/desliga do relevo, layouts UV e exportação (.zip)
 texturas/           imagens usadas como textura (PNG exportado pela tecla X)
-capturas/           capturas de tela (entrega4/: texturas, grade UV, luzes, relevo e layouts UV)
+capturas/           capturas de tela por entrega (entrega2/: cena, câmeras e luzes; entrega4/: texturas, grade UV, relevo e layouts UV)
 entregas/           relatórios de cada entrega
 ```
 
