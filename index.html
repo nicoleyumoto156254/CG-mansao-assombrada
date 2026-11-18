@@ -3,16 +3,32 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Mansão Assombrada 3D — Texturas e Materiais</title>
+  <title>Mansão Assombrada 3D</title>
+  <!-- Fontes cômicas/assustadoras (Google Fonts, licença SIL OFL):
+       Creepster = logo e títulos · Luckiest Guy = HUD, mensagens e botões (Bangers como reserva) -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Creepster&family=Luckiest+Guy&family=Bangers&display=swap" rel="stylesheet" />
   <style>
+    :root {
+      --fonte-logo: 'Creepster', 'Luckiest Guy', cursive;
+      --fonte-hud: 'Luckiest Guy', 'Bangers', 'Comic Sans MS', cursive;
+    }
     html, body { margin: 0; height: 100%; overflow: hidden; background: #05030a; font-family: Georgia, 'Times New Roman', serif; color: #ecdcb4; }
     #app canvas { display: block; }
     .caixa { position: fixed; background: rgba(12, 6, 16, 0.78); border: 1px solid #7a5a2a; border-radius: 6px; padding: 10px 14px; backdrop-filter: blur(3px); }
     #titulo { top: 12px; left: 12px; }
-    #titulo h1 { margin: 0; font-size: 18px; letter-spacing: 0.5px; color: #f2d995; }
+    #titulo h1 { margin: 0; font-family: var(--fonte-logo); font-weight: normal; font-size: 24px; letter-spacing: 1.5px; color: #9cff9e; text-shadow: 0 0 8px rgba(124, 255, 158, 0.6), 2px 2px 0 #1a0a24; }
     #titulo p { margin: 3px 0 0; font-size: 12px; color: #b9a57c; }
-    #controles { bottom: 12px; left: 12px; font-size: 12px; line-height: 1.6; }
-    #controles b { display: inline-block; min-width: 72px; color: #f2d995; }
+    #controles { bottom: 12px; left: 12px; font-size: 12px; line-height: 1.55; }
+    /* grade de 4 colunas: tecla | descrição | tecla | descrição.
+       max-content = cada coluna tem só a largura do maior texto dela (tecla colada na descrição) */
+    #controles .atalhos { display: grid; grid-template-columns: repeat(4, max-content); column-gap: 7px; }
+    #controles .atalhos b { color: #f2d995; white-space: nowrap; }
+    #controles .atalhos span { margin-right: 16px; }      /* separa o 1º par do 2º na mesma linha */
+    #controles .nota { margin-top: 5px; padding-top: 4px; border-top: 1px solid rgba(122, 90, 42, 0.5); color: #b9a57c; font-size: 11px; }
+    #controles .nota b { color: #f2d995; }
+    #hud-modo { font-family: var(--fonte-hud); font-size: 11px; letter-spacing: 1px; color: #9cff9e; min-height: 13px; }
     #status { top: 12px; right: 12px; font-size: 12px; line-height: 1.6; text-align: right; font-family: Consolas, monospace; }
     #status span { color: #f2d995; }
     #luzes { bottom: 12px; right: 12px; font-size: 12px; line-height: 1.6; }
@@ -25,6 +41,53 @@
     #painel th { color: #f2d995; border-bottom: 1px solid #7a5a2a; }
     #painel td:first-child, #painel th:first-child { text-align: left; }
     #painel .legenda { margin-top: 6px; font-size: 11px; }
+
+    /* ---------- jogabilidade: placar, alvo, mensagens e telas ---------- */
+    #placar { top: 12px; left: 50%; transform: translateX(-50%); display: flex; gap: 18px; align-items: center; font-size: 13px; padding: 8px 16px; }
+    #placar .rotulo { display: block; font-family: var(--fonte-hud); font-size: 12px; letter-spacing: 1.5px; color: #b9a57c; }
+    #placar .valor { font-family: var(--fonte-hud); font-size: 26px; color: #f2d995; text-shadow: 2px 2px 0 #1a0a24; }
+    #hud-tempo.alerta { color: #ff5a5a; animation: pisca 0.5s steps(2) infinite; }
+    @keyframes pisca { 50% { opacity: 0.35; } }
+    .barra { position: relative; width: 170px; height: 16px; background: #2a1a1f; border: 1px solid #7a5a2a; border-radius: 3px; overflow: hidden; }
+    .barra > div { height: 100%; transition: width 0.15s; }
+    #hud-vida.ok { background: linear-gradient(#6fe08a, #2f9a4a); } #hud-vida.medio { background: linear-gradient(#ffd35a, #c9921c); } #hud-vida.critico { background: linear-gradient(#ff6a6a, #b02020); }
+    .barra span { position: absolute; inset: 0; text-align: center; font-size: 11px; line-height: 16px; font-family: Consolas, monospace; color: #fff; text-shadow: 0 0 3px #000; }
+    .icone { display: inline-block; width: 14px; height: 14px; border-radius: 50% 50% 40% 40%; border: 2px solid var(--c); margin-right: 3px; opacity: 0.35; vertical-align: middle; }
+    .icone.ativo { opacity: 1; box-shadow: 0 0 6px var(--c); }
+    .icone.preso { opacity: 1; background: var(--c); box-shadow: 0 0 8px var(--c); }
+    .icone.chefe { width: 20px; height: 20px; }
+    #hud-capturas small { color: #b9a57c; margin-left: 4px; }
+    #hud-esquiva { font-size: 11px; color: #8a7a5c; margin-top: 3px; } #hud-esquiva.pronta { color: #9cff9c; }
+    #alvo { bottom: 90px; left: 50%; transform: translateX(-50%); width: 300px; text-align: center; font-size: 13px; opacity: 0; transition: opacity 0.2s; }
+    #alvo .barra { width: 100%; margin-top: 5px; }
+    #mensagem { position: fixed; top: 26%; left: 0; right: 0; text-align: center; font-family: var(--fonte-hud); letter-spacing: 1px; font-size: 32px; color: #f2d995; text-shadow: 0 0 12px #000, 0 0 4px #000; pointer-events: none; opacity: 0; transform: scale(0.9); transition: opacity 0.25s, transform 0.25s; }
+    #mensagem.visivel { opacity: 1; transform: scale(1); }
+    #mensagem.dano { color: #ff6a6a; } #mensagem.pontos { color: #9cff9c; } #mensagem.chefe { color: #ff4040; font-family: var(--fonte-logo); font-size: 52px; letter-spacing: 3px; }
+    #vinheta { position: fixed; inset: 0; pointer-events: none; opacity: 0; background: radial-gradient(ellipse at center, rgba(255,0,0,0) 45%, rgba(200,0,0,0.65) 100%); }
+    #tela { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; background: rgba(5, 3, 10, 0.62); cursor: pointer; }
+    #tela.visivel { display: flex; }
+    #tela .cartao { max-width: 760px; background: rgba(14, 7, 20, 0.94); border: 1px solid #7a5a2a; border-radius: 10px; padding: 22px 30px; text-align: center; box-shadow: 0 0 40px rgba(124, 255, 158, 0.12); }
+    #tela h2 { margin: 0 0 8px; font-family: var(--fonte-logo); font-weight: normal; font-size: 52px; color: #f2d995; letter-spacing: 2px; text-shadow: 3px 3px 0 #1a0a24; }
+    #tela h3, #tela .acao, #tela .recorde, #alvo, #tela table.placar tr.total td { font-family: var(--fonte-hud); letter-spacing: 0.5px; font-weight: normal; }
+    /* logo do menu (texto). Para usar uma imagem: defina LOGO_PNG em js/Hud.js */
+    .logo { line-height: 0.9; margin-bottom: 10px; font-family: var(--fonte-logo); color: #9cff9e;
+            text-shadow: 0 0 14px rgba(124, 255, 158, 0.7), 4px 4px 0 #1a0a24; transform: rotate(-2deg); }
+    .logo .l1 { display: block; font-size: 48px; letter-spacing: 4px; }
+    .logo .l2 { display: block; font-size: 76px; letter-spacing: 2px; color: #c9ffb0; }
+    .logo .l3 { display: inline-block; font-family: var(--fonte-hud); font-size: 30px; color: #f2d995; text-shadow: 3px 3px 0 #1a0a24; transform: rotate(6deg); }
+    .logo-img { max-width: 520px; max-height: 210px; margin-bottom: 8px; }
+    #tela h2.vitoria { color: #9cff9c; } #tela h2.derrota { color: #ff7a7a; }
+    #tela h3 { margin: 10px 0 4px; font-size: 14px; color: #f2d995; text-align: left; }
+    #tela .sub { color: #cdbb94; font-size: 14px; line-height: 1.5; }
+    #tela .colunas { display: flex; gap: 26px; text-align: left; font-size: 13px; line-height: 1.5; }
+    #tela .colunas > div { flex: 1; } #tela ol { margin: 0; padding-left: 18px; }
+    #tela table.teclas td { padding: 1px 8px 1px 0; } #tela table.teclas td:first-child { color: #f2d995; white-space: nowrap; }
+    #tela table.placar { margin: 10px auto; border-collapse: collapse; font-size: 15px; min-width: 380px; }
+    #tela table.placar td { padding: 4px 10px; border-bottom: 1px solid #3a2a1a; text-align: right; } #tela table.placar td:first-child { text-align: left; }
+    #tela table.placar tr.total td { font-size: 20px; color: #f2d995; border-bottom: none; }
+    #tela .recorde { color: #f2d995; } #tela .acao { margin-top: 14px; font-size: 16px; animation: respira 1.6s ease-in-out infinite; }
+    @keyframes respira { 50% { opacity: 0.45; } }
+    body.sem-paineis #status, body.sem-paineis #luzes, body.sem-paineis #controles, body.sem-paineis #titulo { display: none; }
     .x { color: #ff5555; } .y { color: #55ff55; } .z { color: #5599ff; }
   </style>
   <!-- Three.js r186 via CDN (módulos ES) -->
@@ -41,14 +104,33 @@
   <div id="app"></div>
 
   <div id="titulo" class="caixa">
-    <h1>Mansão Assombrada 3D — Entrega 04</h1>
-    <p>Three.js r186 · WebGL · Computação Gráfica 2026</p>
+    <h1>Mansão Assombrada 3D</h1>
+    <p>Jogabilidade, interação e pontuação · Three.js r186</p>
   </div>
+
+  <div id="placar" class="caixa">
+    <div><span class="rotulo">PONTOS</span><span class="valor" id="hud-pontos">0</span></div>
+    <div><span class="rotulo">TEMPO</span><span class="valor"><span id="hud-tempo">1:00</span></span><div id="hud-modo"></div></div>
+    <div>
+      <span class="rotulo">VIDA</span>
+      <div class="barra"><div id="hud-vida" class="ok" style="width:100%"></div><span id="hud-vida-txt">100 / 100</span></div>
+      <div id="hud-esquiva" class="pronta">Esquiva [Shift]: pronta</div>
+    </div>
+    <div><span class="rotulo">FANTASMAS</span><div id="hud-capturas"></div></div>
+  </div>
+
+  <div id="alvo" class="caixa">
+    <span id="alvo-nome">—</span>
+    <div class="barra"><div id="alvo-hp" style="width:100%"></div><span id="alvo-txt">100%</span></div>
+  </div>
+
+  <div id="vinheta"></div>
+  <div id="mensagem"></div>
 
   <div id="status" class="caixa">
     Câmera: <span id="hud-camera">—</span> · FOV: <span id="hud-fov">60°</span><br />
     Texturas: <span id="hud-texturas">—</span><br />
-    Zelador: <span id="hud-pos">—</span><br />
+    Zelador (X, Y, Z): <span id="hud-pos">—</span><br />
     FPS: <span id="hud-fps">—</span>
   </div>
 
@@ -56,19 +138,29 @@
 
   <div id="painel" class="caixa">
     <table>
-      <thead><tr><th>Objeto</th><th>x</th><th>y</th><th>z</th><th>rotY</th><th>esc.</th></tr></thead>
+      <thead><tr><th>Objeto</th><th>X</th><th>Y</th><th>Z</th><th>direção</th><th>esc.</th></tr></thead>
       <tbody id="painel-corpo"></tbody>
     </table>
-    <div class="legenda">Eixos: <span class="x">X = Leste</span> · <span class="y">Y = cima</span> · <span class="z">Z = Sul</span> · grade de 1 m</div>
+    <div class="legenda">Eixos do mapa: <span class="x">X = Leste</span> · <span class="y">Y = Norte</span> · <span class="z">Z = altura</span> · grade de 1 m<br />
+      Direção: 0° = Leste (+X), 90° = Norte (+Y), sentido anti-horário</div>
   </div>
 
   <div id="controles" class="caixa">
-    <b>W A S D</b> mover &nbsp; <b>Mouse / Q E</b> mirar<br />
-    <b>Clique / Espaço</b> aspirador &nbsp; <b>C</b> trocar câmera<br />
-    <b>1–5</b> ligar/desligar luzes &nbsp; <b>P</b> trocar FOV (60/100/30°)<br />
-    <b>H</b> eixos, grade e colisores &nbsp; <b>B</b> prévia do Chefe<br />
-    <b>U</b> grade UV &nbsp; <b>R</b> relevo on/off &nbsp; <b>X</b> exportar texturas (.zip)
+    <div class="atalhos">
+      <b>W A S D</b><span>mover</span>               <b>Mouse · Q E</b><span>mirar</span>
+      <b>Clique · Espaço</b><span>aspirador</span>   <b>Shift</b><span>esquiva</span>
+      <b>Enter</b><span>começar / reiniciar</span>   <b>Esc</b><span>pausa</span>
+      <b>B</b><span>modo Sandbox</span>              <b>M</b><span>som</span>
+      <b>C</b><span>trocar câmera</span>             <b>P</b><span>FOV 60 / 100 / 30°</span>
+      <b>1–5</b><span>ligar/desligar luzes</span>    <b>H</b><span>eixos, grade e colisores</span>
+      <b>U</b><span>grade UV</span>                  <b>R</b><span>relevo</span>
+      <b>X</b><span>exportar texturas</span>         <b>I</b><span>ocultar painéis</span>
+    </div>
+    <div class="nota"><b>Topo e livre:</b> W A S D seguem a tela, a mira segue o cursor · <b>livre:</b> botão direito gira, roda = zoom</div>
+    <div class="nota"><b>Sandbox:</b> J chama o Chefe · F congela os fantasmas · Backspace (na pausa) volta ao menu</div>
   </div>
+
+  <div id="tela"><div class="cartao" id="tela-conteudo"></div></div>
 
   <script type="module" src="js/main.js"></script>
 </body>
