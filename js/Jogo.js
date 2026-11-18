@@ -1,18 +1,3 @@
-// ============================================================================
-// Jogo.js — Jogabilidade: estados da partida, movimento do zelador,
-// comportamento dos fantasmas, atordoamento/captura, dano, coleta de gemas, pontuação,
-// condições de vitória/derrota e reinício.
-//
-// Estados da partida:  menu → jogando ⇄ pausa → vitoria | derrota → (Enter) jogando
-// Modo Sandbox (tecla B): mesma partida, mas sem cronômetro, sem perder vida e
-// sem fim de jogo; fantasmas capturados voltam aos quadros. Serve para demonstrar
-// mecânicas, iluminação e modelagem com calma.
-// Estados de cada fantasma:
-//   oculto → surgindo → cacando ⇄ recuando → capturado → contido
-//   (só o Chefe)        cacando → preparando → investida → cacando
-//   "atordoado" é um temporizador paralelo: enquanto > 0 o fantasma não se move
-//   nem causa dano, e pode ser aspirado.
-// ============================================================================
 import * as THREE from 'three';
 import { REGRAS as R, analisarMira, placarFinal, segundosExibidos } from './regras.js';
 import { ParticulasSuccao } from './Particulas.js';
