@@ -30,6 +30,12 @@ export class Fantasma extends THREE.Group {
     this.cor = new THREE.Color(cor);
     this.semente = Math.random() * 10;
     this.alturaBase = 0;
+    this.chefe = chefe;
+    this.escalaBase = chefe ? 2 : 1;
+    // estado visual controlado pelo Jogo
+    this.atordoado = 0;      // 0..1 (suavizado): rosto assustado, estrelas, corpo piscando
+    this.aspirado = false;   // sendo sugado: corpo deforma, braços se debatem
+    this.corpoVisivel = true;
 
     const corpoMat = new THREE.MeshPhysicalMaterial({
       map: ECTO, emissiveMap: ECTO,
@@ -117,25 +123,68 @@ export class Fantasma extends THREE.Group {
     }
     this.add(this.orbes);
 
+    // ---- estrelas de tontura (aparecem quando atordoado pela lanterna)
+    this.estrelas = new THREE.Group();
+    this.estrelas.position.y = 0.82;
+    const estrelaMat = new THREE.MeshBasicMaterial({ color: 0xffe45c });
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2;
+      this.estrelas.add(malha(new THREE.OctahedronGeometry(0.055), estrelaMat, [Math.cos(a) * 0.3, 0, Math.sin(a) * 0.3]));
+    }
+    this.estrelas.visible = false;
+    this.add(this.estrelas);
+
     // ---- brilho emitido nas paredes/chão próximos
+    // A luz nunca é removida nem escondida durante o jogo (só a intensidade muda):
+    // mudar o número de luzes da cena obrigaria o WebGL a recompilar os shaders.
     if (luz) {
       this.luz = new THREE.PointLight(this.cor, chefe ? 6 : 2.5, chefe ? 9 : 5, 2);
       this.luz.position.y = 0.1;
       this.add(this.luz);
     }
+    this.luzBase = this.luz ? this.luz.intensity : 0;
 
     if (chefe) this.scale.set(2, 2, 2);  // Fantasma Chefe: mesma hierarquia em escala 2×
   }
 
+  // Mostra/oculta as malhas (fantasma ainda dentro do quadro ou já capturado).
+  // A PointLight continua na cena (ver comentário no construtor).
+  mostrarCorpo(v) {
+    this.corpoVisivel = v;
+    for (const c of this.children) if (c !== this.luz && c.type !== 'AxesHelper') c.visible = v;
+  }
+
   atualizar(dt, t) {
     const k = t + this.semente;
-    this.position.y = this.alturaBase + Math.sin(k * 1.6) * 0.12;   // flutuação
+    const a = this.atordoado, asp = this.aspirado ? 1 : 0;
+    this.position.y = this.alturaBase + Math.sin(k * 1.6) * 0.12 * (1 - a * 0.7);   // flutuação
     const p = 0.5 + 0.5 * Math.sin(k * 3);
-    this.nucleo.material.emissiveIntensity = 1.6 + p * 1.4;            // núcleo pulsante
+    this.nucleo.material.emissiveIntensity = 1.6 + p * 1.4 + a * 2;      // núcleo pulsante
     this.nucleo.scale.setScalar(0.9 + p * 0.15);
-    this.pontas.forEach((pv, i) => { pv.rotation.x = Math.sin(k * 4 + i * 0.9) * 0.35; }); // cauda em onda senoidal
-    this.orbes.rotation.y += dt * 1.4;
-    this.bracoEsq.ombro.rotation.x = -1.05 + Math.sin(k * 2.2) * 0.15;
-    this.bracoDir.ombro.rotation.x = -1.05 + Math.sin(k * 2.2 + 1.5) * 0.15;
+    this.pontas.forEach((pv, i) => { pv.rotation.x = Math.sin(k * (4 + asp * 10) + i * 0.9) * (0.35 + asp * 0.3); }); // cauda em onda senoidal
+    this.orbes.rotation.y += dt * (1.4 + a * 6);
+
+    // braços: ameaçadores normalmente, debatendo-se quando aspirado
+    const fb = 2.2 + asp * 13, ab = 0.15 + asp * 0.45;
+    this.bracoEsq.ombro.rotation.x = -1.05 + Math.sin(k * fb) * ab + a * 0.5;
+    this.bracoDir.ombro.rotation.x = -1.05 + Math.sin(k * fb + 1.5) * ab + a * 0.5;
+
+    // rosto: sobrancelhas de raiva → de susto; tremor quando aspirado
+    for (const sob of this.sobrancelhas) {
+      sob.rotation.z = sob.userData.lado * THREE.MathUtils.lerp(0.4, -0.45, a);
+      sob.position.y = 0.36 + 0.05 * a;
+    }
+    this.rosto.position.x = Math.sin(k * 47) * 0.025 * asp;
+
+    // corpo: pisca em branco quando atordoado e "estica" quando aspirado
+    const casca = this.casca.material;
+    casca.emissiveIntensity = 0.6 + a * (0.5 + 0.5 * Math.sin(k * 22));
+    casca.opacity = 0.55 + a * 0.2;
+    const w = Math.sin(k * 30) * 0.09 * asp;
+    this.casca.scale.set(1 - w, 1 + w * 1.4, 1 - w + asp * 0.12);
+
+    this.estrelas.visible = this.corpoVisivel && a > 0.05;
+    this.estrelas.rotation.y += dt * 5;
+    this.estrelas.scale.setScalar(Math.max(a, 0.01));
   }
 }
