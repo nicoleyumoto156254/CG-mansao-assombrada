@@ -1,19 +1,11 @@
-// ============================================================================
-// Hud.js — Interface 2D (HTML sobre o canvas): pontuação, cronômetro, vida,
-// fantasmas capturados, alvo da sucção, mensagens e telas de menu / pausa /
-// vitória / derrota.
-// ============================================================================
 import { formatarTempo, segundosExibidos, REGRAS as R } from './regras.js';
 
 const $ = (id) => document.getElementById(id);
 
-// Logo do menu: null = logo em texto (fonte Creepster, ver index.html).
-// Para usar uma imagem própria, salve-a no repositório e indique o caminho,
-// por exemplo: const LOGO_PNG = 'img/logo.png';
 const LOGO_PNG = null;
 const logoHtml = () => LOGO_PNG
-  ? `<img class="logo-img" src="${LOGO_PNG}" alt="Mansão Assombrada 3D" />`
-  : '<div class="logo"><span class="l1">Mansão</span><span class="l2">Assombrada</span><span class="l3">3D</span></div>';
+  ? `<img class="logo-img" src="${LOGO_PNG}" alt="Mansão Assombrada Computação Gráfica" />`
+  : '<div class="logo"><span class="l1">Mansão</span><span class="l2">Assombrada</span><span class="l3">Computação Gráfica</span></div>';
 const hex = (c) => '#' + c.getHexString();
 
 export class Hud {

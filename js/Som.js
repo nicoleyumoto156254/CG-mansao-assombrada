@@ -1,13 +1,3 @@
-// ============================================================================
-// Som.js — Efeitos sonoros sintetizados com a Web Audio API (nenhum arquivo
-// de áudio). O contexto só é criado após um gesto do jogador (exigência dos
-// navegadores). Tecla M liga/desliga o som.
-//
-// Música de fundo: arquivo opcional em audio/musica.mp3 (ver audio/LEIA-ME.md).
-// Toca em loop durante a partida e pausa no menu, na pausa e no fim de jogo.
-// Se o arquivo não existir, o jogo segue normalmente, só com os efeitos.
-// ============================================================================
-
 const ARQUIVO_MUSICA = 'audio/musica.mp3';
 const VOLUME_MUSICA = 0.35;   // 0 a 1 (os efeitos ficam por cima)
 
@@ -15,11 +5,11 @@ export class Som {
   constructor() {
     this.ctx = null;
     this.mudo = false;
-    this.musica = null;           // HTMLAudioElement (criado no primeiro play)
-    this.semMusica = false;       // true se o arquivo não existe / não carrega
+    this.musica = null;
+    this.semMusica = false;
   }
 
-  // ---------------------------------------------------------- música de fundo
+
   tocarMusica(doInicio = false) {
     if (this.semMusica) return;
     if (!this.musica) {
@@ -30,7 +20,6 @@ export class Som {
     }
     this.musica.muted = this.mudo;
     if (doInicio) this.musica.currentTime = 0;
-    // play() só funciona depois de um gesto do jogador (Enter/clique); falhas são ignoradas
     this.musica.play()?.catch?.(() => {});
   }
 
@@ -56,7 +45,6 @@ export class Som {
     return this.mudo;
   }
 
-  // ruído contínuo filtrado (turbina) + zumbido grave; o volume acompanha o gatilho
   #criarAspirador() {
     const c = this.ctx;
     const buf = c.createBuffer(1, c.sampleRate * 2, c.sampleRate);
@@ -83,7 +71,8 @@ export class Som {
     this.aspOsc.frequency.setTargetAtTime(segurando ? 140 : 95, agora, 0.1);
   }
 
-  // tom simples com envelope e glissando opcional
+//#tom(freq, dur, { tipo, vol, ate, atraso, vibrato })
+
   #tom(freq, dur, { tipo = 'sine', vol = 0.25, ate = null, atraso = 0, vibrato = 0 } = {}) {
     if (!this.ctx) return;
     const c = this.ctx, t0 = c.currentTime + atraso;
